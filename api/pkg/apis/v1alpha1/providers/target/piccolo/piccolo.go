@@ -23,7 +23,7 @@ import (
 )
 
 const loggerName = "providers.target.piccolo"
-const defaultPiccoloApiServer = "http://0.0.0.0:9090/"
+const defaultPiccoloApiServer = "http://0.0.0.0:47099/"
 
 var sLog = logger.NewLogger(loggerName)
 
@@ -165,8 +165,8 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 	ret := step.PrepareResultMap()
 
 	for _, component := range step.Components {
+		name := model.ReadPropertyCompat(component.Component.Properties, "workload.name", injections)
 		if component.Action == model.ComponentUpdate {
-			name := model.ReadPropertyCompat(component.Component.Properties, "workload.name", injections)
 			if name == "" {
 				err = errors.New("component doesn't have workload.name property")
 				ret[component.Component.Name] = model.ComponentResultSpec{
@@ -176,8 +176,9 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 				sLog.ErrorfCtx(ctx, "  P (Piccolo Target): %+v, traceId: %s", err, span.SpanContext().TraceID().String())
 				return ret, err
 			}
-			reqBody := bytes.NewBufferString("https:// scenario path")
-			resp, err := http.Post(i.Config.Url+"create-scenario/"+name, "text/plain", reqBody)
+			//reqBody := bytes.NewBufferString("https:// scenario path")
+			reqBody := bytes.NewBufferString(name)
+			resp, err := http.Post(i.Config.Url+"scenario/"+name, "text/plain", reqBody)
 			if err != nil {
 				sLog.ErrorCtx(ctx, "  P (Piccolo Target): fail to create resource")
 				return ret, err
@@ -190,7 +191,7 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 				Message: "",
 			}
 		} else {
-			req, err := http.NewRequest("DELETE", i.Config.Url+"delete-scenario/"+component.Component.Name, nil)
+			req, err := http.NewRequest("DELETE", i.Config.Url+"scenario/"+name, nil)
 			if err != nil {
 				return ret, err
 			}
