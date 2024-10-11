@@ -102,9 +102,10 @@ func (i *PiccoloTargetProvider) Get(ctx context.Context, deployment model.Deploy
 	ret := make([]model.ComponentSpec, 0)
 	for _, component := range references {
 		properties := component.Component.Properties
-		name := properties["workload.name"].(string)
+		scenarioName := component.Component.Name
+		fileName := properties["workload.name"].(string)
 
-		req, err := http.NewRequest("GET", i.Config.Url+"scenario/"+name, nil)
+		req, err := http.NewRequest("GET", i.Config.Url+"scenario/"+scenarioName+"/"+fileName, nil)
 		if err != nil {
 			sLog.ErrorCtx(ctx, "  P (Piccolo Target): Unable to make Request")
 			return nil, err
@@ -113,7 +114,7 @@ func (i *PiccoloTargetProvider) Get(ctx context.Context, deployment model.Deploy
 		resp, err := client.Do(req)
 
 		if err != nil {
-			sLog.ErrorfCtx(ctx, "  P (Piccolo Target): Unable to get workload %s from piccolo", name)
+			sLog.ErrorfCtx(ctx, "  P (Piccolo Target): Unable to get workload %s from piccolo", fileName)
 			return nil, err
 		}
 
@@ -123,10 +124,10 @@ func (i *PiccoloTargetProvider) Get(ctx context.Context, deployment model.Deploy
 		case http.StatusOK:
 			// respBody, err := io.ReadAll(resp.Body)
 			component := model.ComponentSpec{
-				Name:       name,
+				Name:       scenarioName,
 				Properties: make(map[string]interface{}),
 			}
-			component.Properties["workload.name"] = string(name)
+			component.Properties["workload.name"] = string(fileName)
 			ret = append(ret, component)
 		case http.StatusNotFound:
 			continue
@@ -165,9 +166,11 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 	ret := step.PrepareResultMap()
 
 	for _, component := range step.Components {
-		name := model.ReadPropertyCompat(component.Component.Properties, "workload.name", injections)
+		scenarioName := component.Component.Name
+		fileName := model.ReadPropertyCompat(component.Component.Properties, "workload.name", injections)
+		path := scenarioName + "/" + fileName
 		if component.Action == model.ComponentUpdate {
-			if name == "" {
+			if fileName == "" {
 				err = errors.New("component doesn't have workload.name property")
 				ret[component.Component.Name] = model.ComponentResultSpec{
 					Status:  v1alpha2.UpdateFailed,
@@ -176,9 +179,8 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 				sLog.ErrorfCtx(ctx, "  P (Piccolo Target): %+v, traceId: %s", err, span.SpanContext().TraceID().String())
 				return ret, err
 			}
-			//reqBody := bytes.NewBufferString("https:// scenario path")
-			reqBody := bytes.NewBufferString(name)
-			resp, err := http.Post(i.Config.Url+"scenario/"+name, "text/plain", reqBody)
+			reqBody := bytes.NewBufferString(path)
+			resp, err := http.Post(i.Config.Url+"scenario/"+path, "text/plain", reqBody)
 			if err != nil {
 				sLog.ErrorCtx(ctx, "  P (Piccolo Target): fail to create resource")
 				return ret, err
@@ -191,7 +193,7 @@ func (i *PiccoloTargetProvider) Apply(ctx context.Context, deployment model.Depl
 				Message: "",
 			}
 		} else {
-			req, err := http.NewRequest("DELETE", i.Config.Url+"scenario/"+name, nil)
+			req, err := http.NewRequest("DELETE", i.Config.Url+"scenario/"+path, nil)
 			if err != nil {
 				return ret, err
 			}
