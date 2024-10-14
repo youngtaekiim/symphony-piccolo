@@ -23,7 +23,7 @@ import (
 )
 
 const loggerName = "providers.target.piccolo"
-const defaultPiccoloApiServer = "http://0.0.0.0:47099/"
+const defaultPiccoloApiServer = "http://192.168.50.104:47099/"
 
 var sLog = logger.NewLogger(loggerName)
 
